@@ -3,3 +3,9 @@
 prod.env
 env
 backend/env
+backend/prod.env
+Frontend/Frontend-main/.env
+backend/.gradle/
+backend/garage-data/
+backend/garage-meta/
+.DS_Store

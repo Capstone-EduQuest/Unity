@@ -23,8 +23,12 @@ const hasSentAuthAfterUnityReady = ref(false)
 
 const stageQuery = computed(() => Number(route.query.stage ?? 0))
 const problemQuery = computed(() => String(route.query.problem ?? '').trim())
+const sourceQuery = computed(() => String(route.query.from ?? '').trim())
 const apiBaseUrl = computed(() => import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1')
 const isUnityMode = computed(() => !stageQuery.value && !problemQuery.value)
+const successRedirect = computed(() =>
+  sourceQuery.value === 'review' || sourceQuery.value === 'wrong-note' ? '/review' : '/'
+)
 
 const getAccessToken = () => {
   if (auth.state.accessToken) {
@@ -252,7 +256,7 @@ onBeforeUnmount(() => {
           v-else-if="selectedProblemId"
           class="luxe-panel p-4 sm:p-6"
         >
-          <CodeProblem :problem-id="selectedProblemId" />
+          <CodeProblem :problem-id="selectedProblemId" :success-redirect="successRedirect" />
         </div>
       </main>
     </template>

@@ -19,6 +19,10 @@ import com.eduquest.backend.domain.learning.service.ProblemQueryService;
 import com.eduquest.backend.domain.learning.service.StageQueryService;
 import com.eduquest.backend.domain.reward.service.WalletCommandService;
 import com.eduquest.backend.domain.reward.service.WalletQueryService;
+import com.eduquest.backend.domain.submission.model.Evaluation;
+import com.eduquest.backend.domain.submission.model.Submission;
+import com.eduquest.backend.domain.submission.service.EvaluationQueryService;
+import com.eduquest.backend.domain.submission.service.SubmissionQueryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -49,6 +54,8 @@ public class ProblemService {
     private final MemberQueryService  memberQueryService;
     private final WalletCommandService walletCommandService;
     private final WalletQueryService walletQueryService;
+    private final SubmissionQueryService submissionQueryService;
+    private final EvaluationQueryService evaluationQueryService;
 
     public void createProblem(ProblemCommand command) {
         String problemType = normalizeProblemType(command.type());
@@ -196,6 +203,69 @@ public class ProblemService {
         }).collect(Collectors.toList());
 
         return ProblemListDto.of(page, size, sort, isAsc, results);
+    }
+
+    @Transactional(readOnly = true)
+    public ProblemListDto findReviewProblemsByUserUuid(UUID userUuid, String requesterUserId) {
+        MemberQuery.UserProfile userProfile = memberQueryService.findUserProfileByUuid(userUuid);
+        log.info("복습 문제 조회 시작: userUuid={}, userId={}, requesterUserId={}",
+                userUuid, userProfile.userId(), requesterUserId);
+
+        Long memberId = memberQueryService.findMemberIdByUuid(userUuid);
+        List<Submission> submissions = submissionQueryService.findSubmissionsByUserId(memberId);
+
+        if (submissions == null || submissions.isEmpty()) {
+            log.info("복습 문제 조회 결과 없음: 제출 내역이 없습니다. memberId={}", memberId);
+            return ProblemListDto.of(0, 0, "created_at", false, List.of());
+        }
+
+        Map<Long, Long> submissionToProblemMap = submissions.stream()
+                .filter(submission -> submission.getId() != null && submission.getProblemId() != null)
+                .collect(Collectors.toMap(Submission::getId, Submission::getProblemId, (left, right) -> left));
+
+        if (submissionToProblemMap.isEmpty()) {
+            log.info("복습 문제 조회 결과 없음: 유효한 제출-문제 연결이 없습니다. memberId={}", memberId);
+            return ProblemListDto.of(0, 0, "created_at", false, List.of());
+        }
+
+        Set<Long> solvedProblemIds = evaluationQueryService.findBySubmissionIds(submissionToProblemMap.keySet().stream().toList()).stream()
+                .filter(evaluation -> Boolean.TRUE.equals(evaluation.getIsCorrect()))
+                .map(Evaluation::getSubmissionId)
+                .map(submissionToProblemMap::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (solvedProblemIds.isEmpty()) {
+            log.info("복습 문제 조회 결과 없음: 정답 처리된 문제가 없습니다. memberId={}", memberId);
+            return ProblemListDto.of(0, 0, "created_at", false, List.of());
+        }
+
+        List<ProblemDto> results = problemQueryService.findDetailsByProblemIds(solvedProblemIds.stream().toList()).stream()
+                .map(detail -> {
+                    List<HintDto> hintList = detail.hints() == null ? List.of() : detail.hints().stream()
+                            .map(h -> HintDto.of(h.level(), h.point(), h.content()))
+                            .collect(Collectors.toList());
+
+                    return ProblemDto.of(
+                            detail.uuid(),
+                            detail.stageUuid(),
+                            detail.stageTitle(),
+                            detail.stageNumber(),
+                            detail.type(),
+                            detail.number(),
+                            detail.summary(),
+                            detail.example(),
+                            detail.expectedOutput(),
+                            detail.block(),
+                            hintList
+                    );
+                })
+                .toList();
+
+        log.info("복습 문제 조회 완료: memberId={}, solvedProblemCount={}, resultCount={}",
+                memberId, solvedProblemIds.size(), results.size());
+
+        return ProblemListDto.of(0, results.size(), "number", true, results);
     }
 
     @Transactional

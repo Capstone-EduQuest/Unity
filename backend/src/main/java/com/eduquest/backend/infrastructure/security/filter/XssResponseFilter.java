@@ -70,6 +70,12 @@ public class XssResponseFilter extends OncePerRequestFilter {
 		}
 
 		// 응답 헤더 조정 및 최종 바이트 전송
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+		if (contentType != null && !contentType.isBlank()) {
+			response.setContentType(contentType.contains("charset=")
+					? contentType
+					: contentType + ";charset=" + StandardCharsets.UTF_8.name());
+		}
 		response.setContentLength(outputBytes.length);
 		response.getOutputStream().write(outputBytes);
 	}

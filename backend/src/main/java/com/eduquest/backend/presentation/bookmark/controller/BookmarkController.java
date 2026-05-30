@@ -65,7 +65,8 @@ public class BookmarkController {
                         resultDto.stage(),
                         resultDto.type(),
                         resultDto.number(),
-                        resultDto.problemUuid()
+                        resultDto.problemUuid(),
+                        resultDto.summary()
                 ))
                 .toList();
 
@@ -83,4 +84,3 @@ public class BookmarkController {
         return ResponseEntity.ok(response);
     }
 }
-

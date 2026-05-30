@@ -14,6 +14,7 @@ const error = ref('')
 const loadingFeedback = ref<Record<string, boolean>>({})
 const deletingNote = ref<Record<string, boolean>>({})
 const expandedFeedback = ref<Record<string, boolean>>({})
+const feedbackErrors = ref<Record<string, string>>({})
 
 const loadWrongNotes = async () => {
   if (!auth.state.user) {
@@ -48,6 +49,7 @@ const requestAIFeedback = async (note: WrongNote) => {
   }
 
   loadingFeedback.value[note.uuid] = true
+  feedbackErrors.value[note.uuid] = ''
 
   try {
     const refreshed = await wrongNoteAPI.requestAiFeedback(note.uuid)
@@ -55,11 +57,35 @@ const requestAIFeedback = async (note: WrongNote) => {
     note.is_reviewed = refreshed.is_reviewed
     note.isReviewed = refreshed.isReviewed
   } catch (requestError) {
-    console.error('AI 피드백 요청 실패:', requestError)
-    alert('AI 피드백을 불러오는데 실패했습니다.')
+    feedbackErrors.value[note.uuid] = resolveAiFeedbackErrorMessage(requestError)
+    console.warn('AI 피드백 요청 실패:', feedbackErrors.value[note.uuid])
   } finally {
     loadingFeedback.value[note.uuid] = false
   }
+}
+
+const resolveAiFeedbackErrorMessage = (requestError: unknown) => {
+  const error = requestError as {
+    response?: {
+      data?: {
+        message?: string
+        error?: string
+        details?: {
+          code?: string
+        }
+      }
+    }
+  }
+
+  const data = error.response?.data
+  const serverMessage = data?.message || data?.error || ''
+  const errorCode = data?.details?.code || ''
+
+  if (errorCode === 'AI_FEEDBACK_UNAVAILABLE') {
+    return serverMessage || 'AI 피드백을 생성할 수 없습니다. API 키 또는 AI 서비스 상태를 확인해 주세요.'
+  }
+
+  return serverMessage || 'AI 피드백을 불러오지 못했습니다.'
 }
 
 const deleteWrongNote = async (note: WrongNote) => {
@@ -137,7 +163,7 @@ const toggleFeedback = (note: WrongNote) => {
                 <button
                   v-if="note.problem_uuid || note.problemUuid"
                   class="luxe-button-soft cursor-pointer rounded-full px-4 py-2 text-sm font-medium"
-                  @click="router.push('/game?problem=' + (note.problem_uuid || note.problemUuid))"
+                  @click="router.push('/game?problem=' + (note.problem_uuid || note.problemUuid) + '&from=wrong-note')"
                 >
                   다시 풀기
                 </button>
@@ -197,6 +223,12 @@ const toggleFeedback = (note: WrongNote) => {
               class="flex flex-1 items-center justify-center py-8 text-center font-medium text-[#1A2A4F]/60 animate-pulse"
             >
               AI 튜터가 오답을 분석하고 있습니다...
+            </div>
+            <div
+              v-else-if="feedbackErrors[note.uuid]"
+              class="flex flex-1 items-center justify-center rounded-2xl bg-red-50 px-4 py-8 text-center font-bold text-red-700"
+            >
+              {{ feedbackErrors[note.uuid] }}
             </div>
             <div v-else class="flex flex-1 items-center justify-center py-8 text-center font-medium text-[#1A2A4F]/40">
               버튼을 눌러 AI 피드백을 받아 보세요.

@@ -81,6 +81,8 @@ export type UpdateProblemRequest = CreateProblemRequest
 export interface ProgressResponse {
   results: {
     stage: string | number
+    stageNumber?: number
+    stage_number?: number
     total_question_count?: number
     totalQuestionCount?: number
     clear: number[]
@@ -251,6 +253,14 @@ export const problemAPI = {
   getProblem: async (uuid: string) => {
     const response = await api.get<ProblemDetail>(`/problems/${uuid}`)
     return mapProblem(response.data)
+  },
+  getReviewProblems: async (userUuid: string) => {
+    const response = await api.get<MaybePagedResponse<ProblemDetail>>(`/users/${userUuid}/review-problems`)
+    const normalized = normalizePagedResponse(response.data)
+    return {
+      ...normalized,
+      results: normalized.results.map(mapProblem),
+    }
   },
   createProblem: async (data: CreateProblemRequest) => {
     const response = await api.post('/problems', data)

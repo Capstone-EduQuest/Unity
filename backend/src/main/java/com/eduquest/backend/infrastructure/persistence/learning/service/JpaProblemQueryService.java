@@ -58,10 +58,14 @@ public class JpaProblemQueryService implements ProblemQueryService {
 	}
 
 	@Override
+	public List<ProblemQuery.Detail> findDetailsByProblemIds(List<Long> problemIds) {
+		return problemQueryRepository.findDetailsByProblemIds(problemIds);
+	}
+
+	@Override
 	public List<ProblemQuery.Detail> findDetailsByPagination(int page, int size, String sort, Boolean isAsc) {
 		return problemQueryRepository.findDetailsByPagination(page, size, sort, isAsc);
 	}
 
 }
-
 

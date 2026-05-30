@@ -296,4 +296,70 @@ public class ProblemQRepositoryImpl implements ProblemQRepository {
 
     }
 
+    @Override
+    public List<ProblemQuery.Detail> findDetailsByProblemIds(List<Long> problemIds) {
+        if (problemIds == null || problemIds.isEmpty()) {
+            return List.of();
+        }
+
+        QProblemEntity problemEntity = QProblemEntity.problemEntity;
+        QStageEntity stageEntity = QStageEntity.stageEntity;
+
+        List<ProblemQuery.Detail> problems = queryFactory.select(
+                        Projections.constructor(
+                                ProblemQuery.Detail.class,
+                                problemEntity.id,
+                                problemEntity.uuid,
+                                stageEntity.uuid,
+                                stageEntity.title,
+                                stageEntity.number,
+                                problemEntity.type,
+                                problemEntity.number,
+                                problemEntity.summary,
+                                problemEntity.example,
+                                problemEntity.expectedOutput,
+                                problemEntity.block,
+                                Expressions.constant(List.of())
+                        )
+                )
+                .from(problemEntity)
+                .join(stageEntity).on(problemEntity.stageId.eq(stageEntity.id))
+                .where(problemEntity.id.in(problemIds))
+                .orderBy(stageEntity.number.asc(), problemEntity.number.asc())
+                .fetch();
+
+        if (problems == null || problems.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> foundProblemIds = problems.stream()
+                .map(ProblemQuery.Detail::id)
+                .collect(Collectors.toList());
+
+        List<HintEntity> hintEntities = hintJpaRepository.findAllByProblemIdIn(foundProblemIds);
+        Map<Long, List<HintEntity>> hintsByProblem = hintEntities.stream()
+                .collect(Collectors.groupingBy(HintEntity::getProblemId));
+
+        return problems.stream().map(pq -> {
+            List<ProblemQuery.Hint> hs = hintsByProblem.getOrDefault(pq.id(), List.of()).stream()
+                    .map(h -> ProblemQuery.Hint.of(h.getLevel(), h.getPoint(), h.getContent()))
+                    .collect(Collectors.toList());
+
+            return ProblemQuery.Detail.of(
+                    pq.id(),
+                    pq.uuid(),
+                    pq.stageUuid(),
+                    pq.stageTitle(),
+                    pq.stageNumber(),
+                    pq.type(),
+                    pq.number(),
+                    pq.summary(),
+                    pq.example(),
+                    pq.expectedOutput(),
+                    pq.block(),
+                    hs
+            );
+        }).collect(Collectors.toList());
+    }
+
 }

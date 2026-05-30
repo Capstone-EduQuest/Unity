@@ -1,15 +1,45 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '../components/PageHeader.vue'
 import { bookmarkAPI, type BookmarkItem } from '../api/bookmark'
 import { useAuthStore } from '../store/auth'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const bookmarks = ref<BookmarkItem[]>([])
 const error = ref('')
 const isLoading = ref(true)
+
+const getProblemUuid = (item: BookmarkItem) => item.problem_uuid ?? item.problemUuid ?? ''
+
+const getProblemTitle = (item: BookmarkItem) => {
+  const title = item.summary ?? item.title
+  return title?.trim() || `문제 ${item.number ?? '-'}`
+}
+
+const getProblemMeta = (item: BookmarkItem) => {
+  const stage = item.stage ?? 'Stage -'
+  const number = item.number ? `문제 ${item.number}` : '문제'
+  return `${stage} · ${number}`
+}
+
+const goToProblem = (item: BookmarkItem) => {
+  const problemUuid = getProblemUuid(item)
+
+  if (!problemUuid) {
+    error.value = '문제 정보를 찾을 수 없습니다.'
+    return
+  }
+
+  router.push({
+    path: '/game',
+    query: {
+      problem: problemUuid,
+    },
+  })
+}
 
 onMounted(async () => {
   await auth.restoreAuth(route.path)
@@ -21,7 +51,7 @@ onMounted(async () => {
 
   try {
     const response = await bookmarkAPI.getBookmarkList(auth.state.user.uuid, {
-      page: 1,
+      page: 0,
       size: 50,
       sort: 'created_at',
       is_asc: false,
@@ -73,7 +103,7 @@ onMounted(async () => {
       <section v-else class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <article
           v-for="item in bookmarks"
-          :key="item.problem_uuid ?? `${item.stage}-${item.number}`"
+          :key="getProblemUuid(item) || `${item.stage}-${item.number}`"
           class="luxe-card flex flex-col p-6 transition duration-300 hover:translate-y-[-2px]"
         >
           <div class="flex items-start justify-between gap-4">
@@ -84,14 +114,24 @@ onMounted(async () => {
           </div>
 
           <div class="mt-5 rounded-[24px] border border-[#1A2A4F]/10 bg-[#FFF8F4] p-4">
-            <p class="text-sm font-medium text-[#1A2A4F]/55">문제 번호</p>
-            <p class="mt-2 text-3xl font-black text-[#1A2A4F]">{{ item.number ?? '-' }}</p>
+            <p class="text-sm font-medium text-[#1A2A4F]/55">{{ getProblemMeta(item) }}</p>
+            <p class="mt-2 text-xl font-black leading-snug text-[#1A2A4F]">
+              {{ getProblemTitle(item) }}
+            </p>
           </div>
 
           <div class="mt-4 flex items-center justify-between rounded-[20px] border border-[#1A2A4F]/10 bg-[#FFF6EC] p-4">
             <span class="text-sm font-medium text-[#1A2A4F]">다시 볼 문제</span>
             <span class="text-sm font-bold text-[#1A2A4F]/55">Saved</span>
           </div>
+
+          <button
+            type="button"
+            class="mt-4 w-full rounded-2xl bg-[#1A2A4F] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#243A68]"
+            @click="goToProblem(item)"
+          >
+            문제 다시 풀기
+          </button>
         </article>
       </section>
     </main>

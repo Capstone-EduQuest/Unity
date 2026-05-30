@@ -17,8 +17,9 @@ public interface ProblemQRepository {
 
 	Map<Integer, List<ProblemQuery.Detail>> findDetailsByStageNumbers(List<Integer> stageNumbers);
 
+	List<ProblemQuery.Detail> findDetailsByProblemIds(List<Long> problemIds);
+
 	List<ProblemQuery.Detail> findDetailsByPagination(int page, int size, String sort, Boolean isAsc);
 
 }
-
 

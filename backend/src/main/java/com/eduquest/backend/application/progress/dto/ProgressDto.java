@@ -10,8 +10,7 @@ public final class ProgressDto {
     private ProgressDto() {
     }
 
-    public record ProgressItem(String stage, int totalQuestionCount, List<Integer> clear) {
+    public record ProgressItem(String stage, Integer stageNumber, int totalQuestionCount, List<Integer> clear) {
     }
 
 }
-

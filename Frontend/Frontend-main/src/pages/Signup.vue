@@ -159,11 +159,6 @@ const validateForm = () => {
     return false
   }
 
-  if (!profileImage.value) {
-    setFieldError('profile_image', 'Profile image is required.')
-    return false
-  }
-
   return true
 }
 
@@ -222,7 +217,9 @@ const handleSignup = async () => {
       )
     )
 
-    payload.append('profileImage', profileImage.value as File)
+    if (profileImage.value) {
+      payload.append('profileImage', profileImage.value)
+    }
 
     await authAPI.signUp(payload)
     await router.push('/login')
@@ -354,7 +351,7 @@ const handleSignup = async () => {
 
           <div>
             <div class="mb-2 flex items-center justify-between">
-              <label class="block text-sm font-bold text-[#1A2A4F]">프로필 사진</label>
+              <label class="block text-sm font-bold text-[#1A2A4F]">프로필 사진 선택</label>
               <button
                 v-if="profileImage"
                 type="button"
@@ -368,7 +365,7 @@ const handleSignup = async () => {
               class="flex cursor-pointer items-center justify-between rounded-[22px] border border-[#F7A5A5] bg-[#FFF2EF] px-4 py-4 text-[#1A2A4F] transition hover:border-[#1A2A4F] hover:bg-[#FFF7F2]"
             >
               <span class="truncate pr-4 text-sm sm:text-base">
-                {{ profileImage ? profileImage.name : '프로필 사진 선택' }}
+                {{ profileImage ? profileImage.name : '선택하지 않아도 가입할 수 있어요' }}
               </span>
               <span class="rounded-full bg-[#FFDBB6] px-4 py-2 text-sm font-bold text-[#1A2A4F]">
                 파일 선택

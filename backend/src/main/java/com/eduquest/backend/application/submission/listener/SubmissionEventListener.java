@@ -13,6 +13,7 @@ import com.eduquest.backend.domain.submission.event.SubmissionEvaluatedEvent;
 import com.eduquest.backend.domain.submission.event.WrongNoteCreateRequestedEvent;
 import com.eduquest.backend.domain.submission.service.EvaluationQueryService;
 import com.eduquest.backend.domain.submission.service.SubmissionQueryService;
+import com.eduquest.backend.domain.submission.service.WrongNoteCommandService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,6 +41,7 @@ public class SubmissionEventListener {
     private final ProblemQueryService problemQueryService;
     private final SubmissionQueryService submissionQueryService;
     private final EvaluationQueryService evaluationQueryService;
+    private final WrongNoteCommandService wrongNoteCommandService;
 
     @Async("virtualThreadTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
@@ -67,6 +69,11 @@ public class SubmissionEventListener {
                     event.submissionId(), event.memberId(), event.isCorrect());
             return;
         }
+
+        Submission correctSubmission = submissionQueryService.findSubmissionById(event.submissionId());
+        wrongNoteCommandService.deleteByUserIdAndProblemId(correctSubmission.getUserId(), correctSubmission.getProblemId());
+        log.info("정답 제출 감지. 기존 오답노트 삭제 처리: submissionId={}, userId={}, problemId={}",
+                event.submissionId(), correctSubmission.getUserId(), correctSubmission.getProblemId());
 
         log.info("정답 제출 감지. 스테이지 클리어 체크 시작: submissionId={}, memberId={}, stageUuid={}, problemType={}",
                 event.submissionId(), event.memberId(), event.stageUuid(), event.problemType());

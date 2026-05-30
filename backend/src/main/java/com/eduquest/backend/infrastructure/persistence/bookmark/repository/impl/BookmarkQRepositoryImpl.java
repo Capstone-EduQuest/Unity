@@ -40,7 +40,8 @@ public class BookmarkQRepositoryImpl implements BookmarkQRepository {
                                 stage.title,
                                 problem.type,
                                 problem.number,
-                                problem.uuid
+                                problem.uuid,
+                                problem.summary
                         )
                 )
                 .from(bookmark)
@@ -81,4 +82,3 @@ public class BookmarkQRepositoryImpl implements BookmarkQRepository {
     }
 
 }
-

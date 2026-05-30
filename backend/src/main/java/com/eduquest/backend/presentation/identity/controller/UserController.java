@@ -42,7 +42,7 @@ public class UserController {
             consumes = {MediaType.MULTIPART_FORM_DATA_VALUE}
     )
     public ResponseEntity<String> signUp(
-            @RequestPart(value = "profileImage") MultipartFile profileImage,
+            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage,
             @Valid @RequestPart(value = "profile")ProfileRequest profileRequest
             ) {
 

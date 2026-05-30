@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { userAPI } from '../api/auth'
+import { bookmarkAPI } from '../api/bookmark'
 import { hintAPI, problemAPI, submissionAPI, type HintResponse, type ProblemDetail } from '../api/learning'
 import { useAuthStore } from '../store/auth'
 
 const props = defineProps<{
   problemId?: string | null
+  successRedirect?: string | null
 }>()
 
 const router = useRouter()
@@ -18,6 +20,9 @@ const hintMessage = ref('')
 const usedHintLevels = ref<Set<number>>(new Set())
 const submissionResult = ref<{ success: boolean; message: string } | null>(null)
 const isLoading = ref(false)
+const isBookmarked = ref(false)
+const isBookmarkLoading = ref(false)
+const bookmarkMessage = ref('')
 
 const parsedBlock = computed(() => {
   const rawBlock = problem.value?.block
@@ -37,9 +42,43 @@ const parsedBlock = computed(() => {
 })
 
 const hasBlocks = computed(() => Boolean(parsedBlock.value?.blocks?.length))
+const currentProblemUuid = computed(() => problem.value?.uuid ?? '')
 const availableHints = computed<HintResponse[]>(() =>
   [...(problem.value?.hints ?? [])].sort((left, right) => left.level - right.level),
 )
+
+const syncBookmarkState = async () => {
+  bookmarkMessage.value = ''
+  isBookmarked.value = false
+
+  if (!problem.value) {
+    return
+  }
+
+  await auth.restoreAuth('/game')
+
+  const userUuid = auth.state.user?.uuid
+  if (!userUuid) {
+    return
+  }
+
+  try {
+    const response = await bookmarkAPI.getBookmarkList(userUuid, {
+      page: 0,
+      size: 100,
+      sort: 'created_at',
+      is_asc: false,
+    })
+
+    const targetProblemUuid = currentProblemUuid.value
+    isBookmarked.value = response.results.some((item) => {
+      const problemUuid = item.problem_uuid ?? item.problemUuid
+      return problemUuid === targetProblemUuid
+    })
+  } catch (error) {
+    console.warn('failed to sync bookmark state:', error)
+  }
+}
 
 const refreshCurrentUserCoin = async () => {
   const user = auth.state.user
@@ -85,6 +124,8 @@ const fetchProblem = async () => {
     hintMessage.value = ''
     usedHintLevels.value = new Set()
     submissionResult.value = null
+    bookmarkMessage.value = ''
+    await syncBookmarkState()
   } catch (error) {
     console.error('failed to fetch problem:', error)
     alert('문제를 불러오지 못했습니다.')
@@ -115,7 +156,7 @@ const handleSubmit = async () => {
 
     if (isCorrect) {
       setTimeout(() => {
-        router.push('/')
+        router.push(props.successRedirect || '/')
       }, 2000)
     }
   } catch (error: any) {
@@ -188,8 +229,51 @@ const appendBlock = (index: number) => {
   blockAnswer.value = [...blockAnswer.value, index]
 }
 
+const toggleBookmark = async () => {
+  if (!problem.value || isBookmarkLoading.value) {
+    return
+  }
+
+  isBookmarkLoading.value = true
+  bookmarkMessage.value = ''
+
+  try {
+    if (isBookmarked.value) {
+      await bookmarkAPI.deleteBookmark(problem.value.uuid)
+      isBookmarked.value = false
+      bookmarkMessage.value = '북마크를 해제했습니다.'
+    } else {
+      await bookmarkAPI.createBookmark(problem.value.uuid)
+      isBookmarked.value = true
+      bookmarkMessage.value = '북마크에 저장했습니다.'
+    }
+  } catch (error: any) {
+    const serverMessage =
+      error?.response?.data?.message ??
+      error?.response?.data?.details ??
+      error?.response?.data?.error ??
+      ''
+
+    if (!isBookmarked.value && String(serverMessage).includes('이미')) {
+      isBookmarked.value = true
+      bookmarkMessage.value = '이미 북마크에 저장된 문제입니다.'
+    } else if (
+      isBookmarked.value &&
+      (error?.response?.status === 404 || String(serverMessage).includes('없'))
+    ) {
+      isBookmarked.value = false
+      bookmarkMessage.value = '이미 해제된 북마크입니다.'
+    } else {
+      bookmarkMessage.value = serverMessage || '북마크 처리에 실패했습니다.'
+    }
+
+    console.error('bookmark toggle failed:', error)
+  } finally {
+    isBookmarkLoading.value = false
+  }
+}
+
 watch(() => props.problemId, fetchProblem, { immediate: true })
-onMounted(fetchProblem)
 </script>
 
 <template>
@@ -206,7 +290,21 @@ onMounted(fetchProblem)
     class="flex max-h-[90vh] flex-col overflow-hidden rounded-2xl border-4 border-gray-600 bg-gray-800 p-8 text-white"
   >
     <div class="mb-6 shrink-0">
-      <h2 class="mb-2 text-2xl font-bold text-blue-400">문제 {{ problem.number }}</h2>
+      <div class="mb-2 flex items-center justify-between gap-4">
+        <h2 class="text-2xl font-bold text-blue-400">문제 {{ problem.number }}</h2>
+
+        <button
+          type="button"
+          :disabled="isBookmarkLoading"
+          class="rounded-lg border border-yellow-300 px-3 py-2 text-sm font-bold text-yellow-200 transition hover:bg-yellow-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+          @click="toggleBookmark"
+        >
+          {{ isBookmarked ? '★ 북마크 해제' : '☆ 북마크' }}
+        </button>
+      </div>
+      <p v-if="bookmarkMessage" class="mb-3 text-sm font-bold text-yellow-200">
+        {{ bookmarkMessage }}
+      </p>
       <p class="mb-4 whitespace-pre-line text-gray-300">{{ problem.summary }}</p>
 
       <div v-if="problem.example" class="mb-4 rounded-lg bg-gray-700 p-4">

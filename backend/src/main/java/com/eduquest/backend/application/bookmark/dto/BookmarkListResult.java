@@ -24,12 +24,12 @@ public record BookmarkListResult(
             String stage,
             String type,
             Integer number,
-            UUID problemUuid
+            UUID problemUuid,
+            String summary
     ) {
-        public static Item of(String stage, String type, Integer number, UUID problemUuid) {
-            return new Item(stage, type, number, problemUuid);
+        public static Item of(String stage, String type, Integer number, UUID problemUuid, String summary) {
+            return new Item(stage, type, number, problemUuid, summary);
         }
     }
 
 }
-

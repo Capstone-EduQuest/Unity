@@ -107,6 +107,17 @@ public class ProblemController {
 		return ResponseEntity.ok(ProblemMapper.toListResponse(problems));
 	}
 
+	@PreAuthorize("@authz.isSelfByUuid(authentication, #userUuid) or hasRole('ADMIN')")
+	@GetMapping("/users/{userUuid}/review-problems")
+	public ResponseEntity<ProblemListResponse> listReviewProblems(
+			@PathVariable UUID userUuid,
+			Authentication authentication
+	) {
+		ProblemListDto problems = problemService.findReviewProblemsByUserUuid(userUuid, authentication.getName());
+
+		return ResponseEntity.ok(ProblemMapper.toListResponse(problems));
+	}
+
 	@PreAuthorize("isAuthenticated()")
 	@GetMapping("/problems/{uuid}/hint")
 	public ResponseEntity<HintResponse> findHint(

@@ -21,7 +21,8 @@ public interface ProblemQueryService {
 
     Map<Integer, List<ProblemQuery.Detail>> findAllDetailsByStageNumbers(List<Integer> stageNumbers);
 
+    List<ProblemQuery.Detail> findDetailsByProblemIds(List<Long> problemIds);
+
     List<ProblemQuery.Detail> findDetailsByPagination(int page, int size, String sort, Boolean isAsc);
 
 }
-

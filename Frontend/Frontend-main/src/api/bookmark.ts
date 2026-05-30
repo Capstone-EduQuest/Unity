@@ -6,6 +6,10 @@ export interface BookmarkItem {
   number?: number
   problem_uuid?: string
   problemUuid?: string
+  title?: string
+  summary?: string
+  created_at?: string
+  createdAt?: string
 }
 
 export const bookmarkAPI = {

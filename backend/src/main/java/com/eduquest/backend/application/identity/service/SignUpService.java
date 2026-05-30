@@ -27,7 +27,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 
@@ -54,7 +53,7 @@ public class SignUpService {
             throw new EduQuestException(IdentityErrorCode.PASSWORD_VALID_NOT_SAME);
         }
 
-        Long fileId = command.profileImage() != null ? handleProfileImage(command) : 0L;
+        Long fileId = hasProfileImage(command) ? handleProfileImage(command) : 0L;
 
         // 회원 정보 저장
         Member member = Member.of(
@@ -63,7 +62,7 @@ public class SignUpService {
                 passwordEncoder.encode(command.password()),
                 command.birth(),
                 command.nickname(),
-                true,
+                false,
                 fileId
         );
 
@@ -83,7 +82,7 @@ public class SignUpService {
 
             log.error("회원 저장 실패: {}", command.email());
 
-            if (command.profileImage() != null) {
+            if (fileId != null && fileId > 0L) {
                 String storedName = fileQueryService.findStoredNameByFileId(fileId);
                 eventPublisher.publishEvent(S3FileDeleteEvent.of(storedName));
                 eventPublisher.publishEvent(FileDataDeleteEvent.of(fileId));
@@ -95,29 +94,43 @@ public class SignUpService {
 
     }
 
+    private boolean hasProfileImage(SignUpCommand command) {
+        return command.profileImage() != null && !command.profileImage().isEmpty();
+    }
+
     // 프로필 이미지 처리
     private Long handleProfileImage(SignUpCommand command) {
         String fileName = UUID.randomUUID().toString(); // 고유한 파일 이름 생성
 
+        if (!profileImageFilter.isImage(command.profileImage())) {
+            throw new EduQuestException(AuthErrorCode.INVALID_PROFILE_FILE_FORMAT);
+        }
+
+        String originalFilename = command.profileImage().getOriginalFilename();
+        if (originalFilename == null || !originalFilename.contains(".")) {
+            throw new EduQuestException(AuthErrorCode.INVALID_PROFILE_FILE_FORMAT);
+        }
+
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+
         try (InputStream is = command.profileImage().getInputStream()) {
-
-            if (!profileImageFilter.isImage(command.profileImage())) {
-                throw new EduQuestException(AuthErrorCode.INVALID_PROFILE_FILE_FORMAT);
-            }
-
-            String extension = command.profileImage().getOriginalFilename().substring(command.profileImage().getOriginalFilename().lastIndexOf("."));
 
             s3Client.putObject(
                     fileName,
                     S3FileDto.of(
-                            command.profileImage().getOriginalFilename(),
+                            originalFilename,
                             command.profileImage().getContentType(),
                             extension,
                             is.readAllBytes()
                     )
             );
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            log.warn("프로필 이미지 업로드 실패, 기본 프로필로 진행: originalFilename={}, reason={}",
+                    originalFilename,
+                    e.getMessage(),
+                    e
+            );
+            return 0L;
         }
 
         log.info("프로필 이미지 S3 업로드 성공: {}", fileName);
@@ -126,7 +139,7 @@ public class SignUpService {
         return fileCommandService.saveFile(
                 File.of(
                         StorageType.S3.toString(),
-                        command.profileImage().getOriginalFilename(),
+                        originalFilename,
                         fileName
                 )
         );

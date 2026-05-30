@@ -124,11 +124,15 @@ public class WrongNoteService {
         // wrong note 존재 확인
         Long memberId = memberQueryService.findMemberIdByUserId(userId);
         WrongNoteQuery.Detail detail = wrongNoteQueryService.findWrongDetailNoteByUuid(wrongNoteUuid);
-        Problem problem = problemQueryService.findProblemById(detail.problemId());
+        if (detail == null) {
+            throw new EduQuestException(WrongNoteErrorCode.WRONG_NOTE_NOT_FOUND);
+        }
 
         if (!detail.userId().equals(memberId)) {
             throw new EduQuestException(WrongNoteErrorCode.FORBIDDEN_WRONG_NOTE_ACCESS);
         }
+
+        Problem problem = problemQueryService.findProblemById(detail.problemId());
 
         AiFeedBackRequest request = AiFeedBackRequest.of(
                 problem.getSummary(),
@@ -138,7 +142,14 @@ public class WrongNoteService {
         );
 
         log.info("AI 피드백 생성 시작: wrongNoteUuid={}, userId={}, problemId={}", wrongNoteUuid, memberId, detail.problemId());
-        String aiExplanation = normalizeAiFeedback(chatModelService.generateAiExplanation(request));
+        String aiExplanation;
+        try {
+            aiExplanation = normalizeAiFeedback(chatModelService.generateAiExplanation(request));
+        } catch (RuntimeException exception) {
+            log.warn("AI 피드백 생성 실패: wrongNoteUuid={}, userId={}, problemId={}, message={}",
+                    wrongNoteUuid, memberId, detail.problemId(), exception.getMessage());
+            throw new EduQuestException(WrongNoteErrorCode.AI_FEEDBACK_UNAVAILABLE);
+        }
 
         WrongNote wrongNote = wrongNoteQueryService.findWrongNoteByUuid(wrongNoteUuid);
         wrongNote.updateAiExplanation(aiExplanation);

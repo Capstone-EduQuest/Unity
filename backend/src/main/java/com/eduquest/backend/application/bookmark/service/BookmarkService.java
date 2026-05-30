@@ -77,7 +77,8 @@ public class BookmarkService {
                         summary.stage(),
                         summary.type(),
                         summary.number(),
-                        summary.problemUuid()
+                        summary.problemUuid(),
+                        summary.summary()
                 ))
                 .toList();
 
@@ -85,4 +86,3 @@ public class BookmarkService {
     }
 
 }
-

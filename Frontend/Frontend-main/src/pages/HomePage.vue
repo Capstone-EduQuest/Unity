@@ -30,6 +30,9 @@ interface BookmarkPreview {
 const getStageTotalCount = (stage: { total_question_count?: number; totalQuestionCount?: number }) =>
   stage.totalQuestionCount ?? stage.total_question_count ?? 0
 
+const getProfilePoint = (profile: Awaited<ReturnType<typeof userAPI.getProfile>>) =>
+  profile.wallet?.balance ?? profile.point ?? 0
+
 const userProgress = ref<UserProgress | null>(null)
 const scrollY = ref(0)
 const animatedCoinRatio = ref(0)
@@ -146,7 +149,7 @@ const startMetricAnimations = () => {
 const mapBookmarkPreview = (bookmark: BookmarkItem): BookmarkPreview => ({
   id: bookmark.problem_uuid ?? `${bookmark.stage}-${bookmark.number}`,
   stage: bookmark.stage ?? 'Stage',
-  title: `문제 ${bookmark.number ?? '-'}`,
+  title: bookmark.summary?.trim() || bookmark.title?.trim() || `문제 ${bookmark.number ?? '-'}`,
   note: `${bookmark.stage ?? '선택한 스테이지'}에서 다시 확인하고 싶은 문제예요.`,
   difficulty: bookmark.type ?? 'basic',
 })
@@ -163,25 +166,21 @@ const loadHomeData = async () => {
     userAPI.getProfile(auth.state.user.uuid),
     progressAPI.getProgress(auth.state.user.uuid),
     bookmarkAPI.getBookmarkList(auth.state.user.uuid, {
-      page: 1,
+      page: 0,
       size: 3,
       sort: 'created_at',
       is_asc: false,
     }),
     wrongNoteAPI.getUserWrongNotes(auth.state.user.uuid, {
-      page: 1,
+      page: 0,
       size: 100,
       sort: 'created_at',
       is_asc: false,
     }),
   ])
 
-  if (profileResult.status !== 'fulfilled' || progressResult.status !== 'fulfilled') {
-    throw new Error('core home data unavailable')
-  }
-
-  const profile = profileResult.value
-  const progressResponse = progressResult.value
+  const profile = profileResult.status === 'fulfilled' ? profileResult.value : null
+  const progressResponse = progressResult.status === 'fulfilled' ? progressResult.value : { results: [] }
   const bookmarkResponse =
     bookmarkResult.status === 'fulfilled' ? bookmarkResult.value : { results: [] as BookmarkItem[] }
   const wrongNotesResponse = wrongNotesResult.status === 'fulfilled' ? wrongNotesResult.value : { results: [] }
@@ -195,19 +194,30 @@ const loadHomeData = async () => {
 
   userProgress.value = {
     level: clearedStages + 1,
-    exp: profile.point ?? 0,
+    exp: profile ? getProfilePoint(profile) : 0,
     expMax: Math.max((clearedStages + 1) * 100, 100),
     clearedStages,
     totalStages,
   }
 
-  stats.value.coinCurrent = profile.point ?? 0
+  stats.value.coinCurrent = profile ? getProfilePoint(profile) : 0
   stats.value.coinGoal = userProgress.value.expMax
   stats.value.correct = solvedCount
   stats.value.wrong = wrongCount
   bookmarkedProblems.value = bookmarkResponse.results.map(mapBookmarkPreview)
 
-  if (bookmarkResult.status !== 'fulfilled' || wrongNotesResult.status !== 'fulfilled') {
+  if (
+    profileResult.status !== 'fulfilled' ||
+    progressResult.status !== 'fulfilled' ||
+    bookmarkResult.status !== 'fulfilled' ||
+    wrongNotesResult.status !== 'fulfilled'
+  ) {
+    console.warn('home data partial failure:', {
+      profileResult,
+      progressResult,
+      bookmarkResult,
+      wrongNotesResult,
+    })
     pageError.value = '일부 학습 정보를 불러오지 못해 기본 데이터로 표시하고 있어요.'
   }
 }

@@ -39,11 +39,10 @@ public class ProgressController {
         List<ProgressDto.ProgressItem> progressItems = progressService.findByUserUuid(userUuid, requesterUserId);
 
         List<ProgressResponse> results = progressItems.stream()
-                .map(item -> ProgressResponse.of(item.stage(), item.totalQuestionCount(), item.clear()))
+                .map(item -> ProgressResponse.of(item.stage(), item.stageNumber(), item.totalQuestionCount(), item.clear()))
                 .toList();
 
         return ResponseEntity.ok(ProgressListResponse.of(results));
     }
 
 }
-

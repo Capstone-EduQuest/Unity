@@ -12,12 +12,12 @@ public class BookmarkQuery {
             String stage,
             String type,
             Integer number,
-            UUID problemUuid
+            UUID problemUuid,
+            String summary
     ) {
-        public static Summary of(String stage, String type, Integer number, UUID problemUuid) {
-            return new Summary(stage, type, number, problemUuid);
+        public static Summary of(String stage, String type, Integer number, UUID problemUuid, String summary) {
+            return new Summary(stage, type, number, problemUuid, summary);
         }
     }
 
 }
-

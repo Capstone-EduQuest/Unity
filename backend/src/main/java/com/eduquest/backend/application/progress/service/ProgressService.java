@@ -75,7 +75,7 @@ public class ProgressService {
                     .map(ProblemQuery.Detail::number)
                     .collect(Collectors.toList());
 
-            results.add(new ProgressDto.ProgressItem(stage.stageTitle(), stage.totalQuestionCount().intValue(), clearedNumbers));
+            results.add(new ProgressDto.ProgressItem(stage.stageTitle(), stage.stageNumber(), stage.totalQuestionCount().intValue(), clearedNumbers));
         }
 
         return results;

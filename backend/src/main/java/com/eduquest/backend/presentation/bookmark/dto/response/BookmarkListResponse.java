@@ -22,11 +22,11 @@ public record BookmarkListResponse(
             String stage,
             String type,
             Integer number,
-            @JsonProperty("problem_uuid") UUID problemUuid
+            @JsonProperty("problem_uuid") UUID problemUuid,
+            String summary
     ) {
-        public static Result of(String stage, String type, Integer number, UUID problemUuid) {
-            return new Result(stage, type, number, problemUuid);
+        public static Result of(String stage, String type, Integer number, UUID problemUuid, String summary) {
+            return new Result(stage, type, number, problemUuid, summary);
         }
     }
 }
-

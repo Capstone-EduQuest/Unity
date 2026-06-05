@@ -32,7 +32,7 @@ const parsedBlock = computed(() => {
 
   if (typeof rawBlock === 'string') {
     try {
-      return JSON.parse(rawBlock) as { answer?: number[]; blocks?: Array<{ code: string }> }
+      return JSON.parse(rawBlock) as { answer?: number[]; blocks?: Array<{ order?: number; code: string }> }
     } catch {
       return null
     }
@@ -46,6 +46,30 @@ const currentProblemUuid = computed(() => problem.value?.uuid ?? '')
 const availableHints = computed<HintResponse[]>(() =>
   [...(problem.value?.hints ?? [])].sort((left, right) => left.level - right.level),
 )
+
+const decodeHtmlText = (value?: string) => {
+  if (!value) return ''
+
+  let decoded = value
+
+  for (let i = 0; i < 3; i += 1) {
+    decoded = decoded
+      .replaceAll('&amp;', '&')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#34;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&#96;', '`')
+      .replace(/&#(x?[0-9a-fA-F]+);/g, (_, rawCode: string) => {
+        const isHex = rawCode.startsWith('x') || rawCode.startsWith('X')
+        const codePoint = Number.parseInt(isHex ? rawCode.slice(1) : rawCode, isHex ? 16 : 10)
+        return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : `&#${rawCode};`
+      })
+  }
+
+  return decoded
+}
 
 const syncBookmarkState = async () => {
   bookmarkMessage.value = ''
@@ -137,8 +161,8 @@ const handleSubmit = async () => {
     return
   }
 
-  const answer = hasBlocks.value && blockAnswer.value.length > 0 ? blockAnswer.value : code.value
-  if (typeof answer === 'string' && !answer.trim()) {
+  const answer = hasBlocks.value ? buildOrderingAnswer() : code.value
+  if (!answer.trim()) {
     return
   }
 
@@ -227,6 +251,20 @@ const resolveHintErrorMessage = (error: any) => {
 
 const appendBlock = (index: number) => {
   blockAnswer.value = [...blockAnswer.value, index]
+}
+
+const buildOrderingAnswer = () => {
+  const blocks = parsedBlock.value?.blocks ?? []
+  const codeByOrder = new Map<number, string>()
+
+  blocks.forEach((block, index) => {
+    codeByOrder.set(block.order ?? index + 1, decodeHtmlText(block.code).trim())
+  })
+
+  return blockAnswer.value
+    .map((order) => codeByOrder.get(order) ?? '')
+    .filter((blockCode) => blockCode.length > 0)
+    .join('\n')
 }
 
 const toggleBookmark = async () => {
@@ -329,9 +367,9 @@ watch(() => props.problemId, fetchProblem, { immediate: true })
             :key="`${index}-${block.code}`"
             type="button"
             class="rounded-lg bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
-            @click="appendBlock(index + 1)"
+            @click="appendBlock(block.order ?? index + 1)"
           >
-            {{ index + 1 }}. {{ block.code }}
+            {{ block.order ?? index + 1 }}. {{ decodeHtmlText(block.code) }}
           </button>
         </div>
         <p class="mt-3 text-sm text-blue-300">선택 순서: {{ blockAnswer.join(', ') || '아직 없음' }}</p>

@@ -275,7 +275,7 @@ export const problemAPI = {
 }
 
 export const submissionAPI = {
-  submitProblem: async (problemUuid: string, answer: string | number[]) => {
+  submitProblem: async (problemUuid: string, answer: string) => {
     const response = await api.post<SubmissionResponse>(`/problems/${problemUuid}/submissions`, { answer })
     return response.data
   },
